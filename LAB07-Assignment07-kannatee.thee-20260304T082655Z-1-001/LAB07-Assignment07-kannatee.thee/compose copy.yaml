@@ -1,0 +1,92 @@
+# โครงสร้างพื้นฐาน Assignment 07 (Skeletal Version)
+
+name: ${PROJECT_NAME}  # ใช้ตัวแปรจาก .env เพื่อกำหนดชื่อโปรเจค
+
+services:
+  # 1. ฐานข้อมูล (Database)
+  db-server:
+    image: mariadb:10.6
+    container_name: ${MY_USERNAME}-db # ใช้ตัวแปรจาก .env เพื่อกำหนดชื่อคอนเทนเนอร์
+    restart: always
+    environment:
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: app_user
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/????????? # ใช้ Secret
+      MARIADB_PASSWORD_FILE: ????????????????     # ใช้ Secret
+networks:
+  - ?????????????-zone # ต้องเชื่อมกับ Backend เพื่อให้ Backend ติดต่อ DB ได้
+volumes:
+  - ??????????:/var/lib/mysql # ใช้ Volume เพื่อเก็บข้อมูลถาวร
+secrets:
+    - ?????????????? # ให้ DB เข้ามาอ่านรหัสผ่านเพื่อตั้งค่าได้
+    - ????????????? # ให้ DB เข้ามาอ่านรหัสผ่านเพื่อตั้งค่าได้
+
+  # 2. ส่วนประมวลผล (Backend)
+  backend-php:
+    image: bitnami/php-fpm:latest
+    container_name: ${MY_USERNAME}-php # ใช้ตัวแปรจาก .env เพื่อกำหนดชื่อคอนเทนเนอร์
+    restart: always
+    volumes:
+     - ./????????:/var/www/html # เชื่อมโฟลเดอร์ที่มีไฟล์ index.php เข้ากับโฟลเดอร์ในคอนเทนเนอร์
+     networks:
+      - ?????????????-zone # ต้องเชื่อมกับ DB เพื่อให้ Backend ติดต่อ DB ได้
+    secrets:
+      - ????????????? # ให้ Backend เข้ามาอ่านรหัสผ่านเพื่อต่อ DB ได้
+
+  # 3. ส่วนรับงานหน้าบ้าน (Web Proxy)
+  web-proxy:
+    image: nginx:latest
+    container_name: ${MY_USERNAME}-web # ใช้ตัวแปรจาก .env เพื่อกำหนดชื่อคอนเทนเนอร์
+    restart: always
+    ports:
+      - "${HTTP_PORT}:80"
+    volumes:
+      - ./???:/var/www/html # เชื่อมโฟลเดอร์ที่มีไฟล์ index.php เข้ากับโฟลเดอร์ในคอนเทนเนอร์ 
+    configs:
+      - source: ????????????? # เชื่อม Config ที่เราสร้างขึ้นมาให้ Nginx ใช้งาน
+        target: /etc/nginx/conf.d/default.conf
+    networks:
+      - ????????????-zone # ต้องเชื่อมกับ frontend เพื่อให้ Nginx รับ Request จาก frontend ได้
+- ????????????-zone # ต้องเชื่อม Backend เพื่อส่งต่อ Request
+    depends_on:
+      - backend-php # ต้องรอให้ Backend พร้อมก่อนถึงจะเริ่มทำงานได้
+
+  # 4. ส่วนจัดการฐานข้อมูล (phpMyAdmin)
+  db-management:
+    image: phpmyadmin:latest
+    container_name: ${MY_USERNAME}-pma # ใช้ตัวแปรจาก .env เพื่อกำหนดชื่อคอนเทนเนอร์
+    restart: always
+    environment:
+      PMA_HOST: db-server # ชี้ไปที่ชื่อบริการของ DB ใน Docker Compose
+      PMA_PASSWORD_FILE: /run/secrets/???????????????? # ใช้ Secret ในการ Login
+    ports:
+      - "${PMA_PORT}:80"
+    networks:
+      - ???????????-zone # อยู่ในโซนเดียวกับ DB เพื่อให้ติดต่อกันได้
+    depends_on:
+      - db-server # ต้องรอให้ DB พร้อมก่อนถึงจะเริ่มทำงานได้
+    secrets:
+      - ???????????????? # ให้ phpMyAdmin เข้ามาอ่านรหัสผ่านเพื่อต่อ DB ได้
+
+# --------------------------------------------------
+# ส่วนประกาศทรัพยากรส่วนกลาง (Top-level Elements)
+# --------------------------------------------------
+
+networks:
+  frontend-zone:
+    driver: bridge
+  ????????????????-zone: # ต้องสร้างอีกโซนสำหรับ Backend และ DB ให้ติดต่อกันได้
+    driver: bridge
+
+volumes:
+  db-storage:
+
+configs:
+  my-nginx-conf:
+    file: ./???????????????????.conf # ไฟล์ Config ของ Nginx ที่เราจะสร้างขึ้นมาเอง
+
+secrets:
+  db_root_pass:
+    file: ./?????????????? # ไฟล์ที่เก็บรหัสผ่านของ root user ของ DB
+  db_user_pass:
+    file: ./???????????? # ไฟล์ที่เก็บรหัสผ่านของ app_user ของ DB
